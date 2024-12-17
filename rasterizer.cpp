@@ -4,7 +4,10 @@ using namespace std;
 
 void rasterizer::clearZBuffer()
 {
-    fill_n(zBuffer, width * height, numeric_limits<float>::infinity());
+    delete[] zBuffer;
+    int sz = max(width * height, newWidth * newHeight);
+    zBuffer = new atomic<float>[sz];
+    fill_n(zBuffer, sz, numeric_limits<float>::infinity());
 }
 static void computeBarycentric2D(double x, double y, const Triangle &t, double *param)
 {
@@ -68,6 +71,7 @@ void rasterizer::drawTriangle(Triangle tri, Triangle ctri, const model &mod)
             while (!tri.inside(i, ridx) && ridx > max(miny, 0))
                 ridx--;
         }
+        ridx = min(ridx, height - 1);
         for (int j = lidx; j <= ridx; j++)
         {
             if (!tri.inside(i, j))
@@ -137,11 +141,7 @@ void rasterizer::setRasterizeSize(int _width, int _height)
 void rasterizer::draw()
 {
     // wnd.clear();
-    if (newWidth && newHeight)
-    {
-        width = newWidth;
-        height = newHeight;
-    }
+
 
     if (pCam)
         pCam->resize(width, height);
@@ -205,6 +205,11 @@ void rasterizer::draw()
     for (auto &f : v)
         f.get();
     // thread t2(&rasterizer::clearZBuffer,*this);
+    if (newWidth && newHeight)
+    {
+        width = newWidth;
+        height = newHeight;
+    }
     f = async(&rasterizer::clearZBuffer, this);
     // t1.join();
     // t2.join();

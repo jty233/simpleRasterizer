@@ -10,6 +10,7 @@ class simpleWindow
 private:
     cv::Mat wndMat;
     int nWidth, nHeight;
+    int lstWidth, lstHeight;
     bool bPress[128];
     char lastPress;
     std::function<void(int, int)> resizeCallback;

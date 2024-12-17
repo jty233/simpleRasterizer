@@ -10,10 +10,12 @@ using namespace cv;
 void simpleWindow::create(const char *name, int width, int height)
 {
     wndMat.create(height, width, CV_8UC3);
-    nWidth = width;
-    nHeight = height;
+    lstWidth = nWidth = width;
+    lstHeight = nHeight = height;
 
     windowName = name;
+    namedWindow(windowName, cv::WINDOW_NORMAL);
+    resizeWindow(windowName, width, height);
 
     show();
 }
@@ -21,7 +23,13 @@ void simpleWindow::create(const char *name, int width, int height)
 void simpleWindow::show()
 {
     imshow(windowName, wndMat);
-    waitKey(1);
+    resize(wndMat, wndMat, {lstWidth, lstHeight});
+    auto res = getWindowImageRect(windowName);
+    if (resizeCallback)
+        resizeCallback(res.width, res.height);
+    lstWidth = res.width;
+    lstHeight = res.height;
+    lastPress = waitKey(1);
 }
 
 bool simpleWindow::shouldClose()
@@ -51,7 +59,7 @@ void simpleWindow::clear()
 
 void simpleWindow::setBkColor(int r, int g, int b)
 {
-    bkColor = vec3(r,g,b);
+    bkColor = vec3(r, g, b);
     clear();
 }
 
@@ -64,5 +72,7 @@ char simpleWindow::getKey()
 {
     char key = lastPress;
     lastPress = 0;
+    if (key & 32)
+        key ^= 32;
     return key;
 }

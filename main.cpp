@@ -31,6 +31,7 @@ float getfps()
 }
 int main()
 {
+    cout << std::thread::hardware_concurrency() << endl;
     wnd.create("hello world", width, height);
     wnd.setBkColor(220, 230, 210);
 
@@ -61,7 +62,7 @@ int main()
     //     mod.getTriangle(i).setColor(0, 0, 100);
 
     objl::Loader Loader;
-    Loader.LoadFile("../../models/spot/spot_triangulated_good.obj");
+    Loader.LoadFile("../models/spot/spot_triangulated_good.obj");
     for (auto mesh : Loader.LoadedMeshes)
     {
         for (int i = 0; i < mesh.Vertices.size(); i += 3)
@@ -77,7 +78,7 @@ int main()
             mod.addTriangle(t);
         }
     }
-    mod.loadTexture("../../models/spot/spot_texture.png");
+    mod.loadTexture("../models/spot/spot_texture.png");
     mod = mod.scale(vec3(2.5, 2.5, 2.5));
     mod = mod.rotate(140, vec3(0, 1, 0));
 
@@ -110,6 +111,8 @@ int main()
         {
             cam.transform(vec3(0, 0, 0.1));
         }
+        else if (key == 27)
+            break;
         // mod.rotate(1, vec3(0.5, 0.7, 0.3));
         wnd.clear();
         ras.draw(); // 主要计算任务
