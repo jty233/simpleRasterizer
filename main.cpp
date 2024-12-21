@@ -68,7 +68,7 @@ int main()
         for (int i = 0; i < mesh.Vertices.size(); i += 3)
         {
             Triangle t;
-            t.setColor(148, 121, 92);
+            t.setColor(255, 255, 255);
             for (int j = 0; j < 3; j++)
             {
                 t.setVertex(vec3(mesh.Vertices[i + j].Position.X, mesh.Vertices[i + j].Position.Y, mesh.Vertices[i + j].Position.Z), j);

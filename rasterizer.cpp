@@ -195,7 +195,7 @@ void rasterizer::draw()
                     tri.normal[i] = nor;
             }
             // tri.normal[i] = vec3(1,0,0);
-#ifndef _DEBUG
+#ifndef __DEBUG__
             v.push_back(poolIns.assign(bind(&rasterizer::drawTriangle, this, tri, ctri, ref(m))));
 #else
             drawTriangle(tri, ctri, m);
