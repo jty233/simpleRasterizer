@@ -14,7 +14,7 @@ private:
     int width, newWidth;
     int height, newHeight;
     camera *pCam = nullptr;
-    std::atomic<float> *zBuffer;
+    std::deque<std::atomic<float>> zBuffer;
     lightShader lig;
     ThreadPool &poolIns;
     std::function<void(int, int, int, int, int)> setPixel;

@@ -4,10 +4,9 @@ using namespace std;
 
 void rasterizer::clearZBuffer()
 {
-    delete[] zBuffer;
     int sz = max(width * height, newWidth * newHeight);
-    zBuffer = new atomic<float>[sz];
-    fill_n(zBuffer, sz, numeric_limits<float>::infinity());
+    zBuffer.resize(sz);
+    fill_n(zBuffer.begin(), sz, numeric_limits<float>::infinity());
 }
 static void computeBarycentric2D(double x, double y, const Triangle &t, double *param)
 {
@@ -131,7 +130,7 @@ void rasterizer::drawTriangle(Triangle tri, Triangle ctri, const model &mod)
 
 rasterizer::rasterizer(int width, int height) : width(width), height(height), poolIns(ThreadPool::getInstance())
 {
-    zBuffer = new atomic<float>[width * height];
+    clearZBuffer();
 }
 void rasterizer::setRasterizeSize(int _width, int _height)
 {
