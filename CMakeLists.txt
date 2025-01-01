@@ -10,7 +10,8 @@ endif()
 
 find_package(SDL2 CONFIG REQUIRED)
 
-file(GLOB SOURCE ./*.cpp)
+include_directories(include)
+file(GLOB SOURCE src/*.cpp)
 add_executable(games ${SOURCE})
 target_link_libraries(
     ${PROJECT_NAME}
