@@ -18,7 +18,7 @@ private:
     void updViewMartx();
 public:
     camera() {}
-    void init(vec3 _pos, double _fov, double _aspect_ratio, double _zNear, double _zFar, vec3 _lookat = {0, 0, -1});
+    void init(vec3 _pos, double _fov, double _zNear, double _zFar, vec3 _lookat = {0, 0, -1});
     void resize(int width, int height);
     void transform(vec3 v);
     void setViewTarget(vec3 target);

@@ -20,11 +20,10 @@ void camera::updViewMartx()
                  viewMatrix;
 }
 
-void camera::init(vec3 _pos, double _fov, double _aspect_ratio, double _zNear, double _zFar, vec3 _lookat)
+void camera::init(vec3 _pos, double _fov, double _zNear, double _zFar, vec3 _lookat)
 {
     pos = _pos;
     fov = _fov * acos(-1) / 180;
-    aspect_ratio = _aspect_ratio;
     zNear = -_zNear;
     zFar = -_zFar;
     lookat = _lookat.normalize();

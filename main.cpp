@@ -34,19 +34,14 @@ int main(int argc,char* argv[])
 {
     cout << std::thread::hardware_concurrency() << endl;
     wnd.create("hello world", width, height);
-    wnd.setBkColor(220, 230, 210);
+    ras.setBkColor(220, 230, 210);
 
-    cam.init(vec3(0, 0, 10), 45, (double)width / height, 0.1, 50);
+    cam.init(vec3(0, 0, 10), 45, 0.1, 50);
     cam.setViewTarget(vec3(0, 0, 0));
     ras.setCamera(cam);
 
     ras.addLight(vec3(20, 20, 20));
     ras.addLight(vec3(-20, 20, 0));
-
-    ras.bindSetPixelFunc([](int x, int y, int r, int g, int b)
-                         { wnd.setPixel(x, y, r, g, b); });
-
-    wnd.setResizeCallback(bind(&rasterizer::setRasterizeSize, &ras, placeholders::_1, placeholders::_2));
 
     model mod;
 
@@ -94,33 +89,34 @@ int main(int argc,char* argv[])
         //     double deg = key == 'A' ? 1 : -1;
         //     mod.rotate(deg, vec3(1, 0, 0));
         // }
-        if (key == 'A')
+        if (key == 'a')
         {
             // cam.transform(vec3(-1, 0, 0));
             mod = mod.rotate(-5, vec3(0, 1, 0));
         }
-        else if (key == 'D')
+        else if (key == 'd')
         {
             // cam.transform(vec3(1, 0, 0));
             mod = mod.rotate(5, vec3(0, 1, 0));
         }
-        else if (key == 'W')
+        else if (key == 'w')
         {
             cam.transform(vec3(0, 0, -0.1));
         }
-        else if (key == 'S')
+        else if (key == 's')
         {
             cam.transform(vec3(0, 0, 0.1));
         }
         else if (key == 27)
             break;
         // mod.rotate(1, vec3(0.5, 0.7, 0.3));
-        wnd.clear();
-        ras.draw(); // 主要计算任务
-        wnd.show();    // 消息处理循环
+        auto optResize = wnd.processWindowEvent();
+        if (optResize)
+            ras.setRasterizeSize(optResize->first, optResize->second);
+        auto data = ras.draw(); // 主要计算任务
+        wnd.show(data);    // 消息处理循环
 
-        // Sleep(10);
-        // wnd.clear();
+        // this_thread::sleep_for(100ms);
         cout << '\r' << getfps() << "      ";
     }
     return 0;

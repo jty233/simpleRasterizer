@@ -2,11 +2,12 @@
 #include <cmath>
 using namespace std;
 
-void rasterizer::clearZBuffer()
+void rasterizer::clearBuffer()
 {
-    int sz = max(width * height, newWidth * newHeight);
+    int sz = width * height;
     zBuffer.resize(sz);
     fill_n(zBuffer.begin(), sz, numeric_limits<float>::infinity());
+    frameBuffer.assign(sz, bkColor);
 }
 static void computeBarycentric2D(double x, double y, const Triangle &t, double *param)
 {
@@ -120,7 +121,7 @@ void rasterizer::drawTriangle(Triangle tri, Triangle ctri, const model &mod)
             {
                 if (zBuffer[j * width + i].compare_exchange_weak(oldValue, z))
                 {
-                    setPixel(i, j, int(color[0]), int(color[1]), int(color[2]));
+                    setPixel(j, i, color[0], color[1], color[2]);
                     break;
                 }
             }
@@ -128,26 +129,30 @@ void rasterizer::drawTriangle(Triangle tri, Triangle ctri, const model &mod)
     }
 }
 
-rasterizer::rasterizer(int width, int height) : width(width), height(height), poolIns(ThreadPool::getInstance())
+void rasterizer::setPixel(int x, int y, int r, int g, int b)
 {
-    clearZBuffer();
+    x = height - x - 1; // 翻转y坐标
+    frameBuffer[x * width + y] = (r << 16) | (g << 8) | b;
+}
+
+rasterizer::rasterizer(int width, int height) : width(width), height(height), resize(true), poolIns(ThreadPool::getInstance())
+{
 }
 void rasterizer::setRasterizeSize(int _width, int _height)
 {
-    newWidth = _width;
-    newHeight = _height;
+    width = _width;
+    height = _height;
+    resize = true;
 }
-void rasterizer::draw()
+std::span<uint32_t> rasterizer::draw()
 {
-    // wnd.clear();
-
-
-    if (pCam)
+    if (pCam && resize)
+    {
         pCam->resize(width, height);
+        resize = false;
+    }
 
-    static future<void> f;
-    if (f.valid())
-        f.get();
+    clearBuffer();
     // const vec3 &view_pos = pCam->pos;
     Matrix viewpointMatrix = {
         {width / 2., 0, 0, width / 2.},
@@ -170,7 +175,7 @@ void rasterizer::draw()
             mvpv = viewpointMatrix * m.modelMatrix;
             mv = m.modelMatrix;
         }
-        // clearZBuffer();
+        // clearBuffer();
         for (auto p : m.lines)
         {
             Triangle tri = {p.first, p.second, Point{}};
@@ -193,7 +198,6 @@ void rasterizer::draw()
                 else
                     tri.normal[i] = nor;
             }
-            // tri.normal[i] = vec3(1,0,0);
 #ifndef __DEBUG__
             v.push_back(poolIns.assign(bind(&rasterizer::drawTriangle, this, tri, ctri, ref(m))));
 #else
@@ -203,17 +207,7 @@ void rasterizer::draw()
     }
     for (auto &f : v)
         f.get();
-    // thread t2(&rasterizer::clearZBuffer,*this);
-    if (newWidth && newHeight)
-    {
-        width = newWidth;
-        height = newHeight;
-    }
-    f = async(&rasterizer::clearZBuffer, this);
-    // t1.join();
-    // t2.join();
-
-    // models.clear();
+    return span<uint32_t>(frameBuffer);
 }
 
 void rasterizer::addLight(vec3 pos)
@@ -270,7 +264,6 @@ void rasterizer::drawLine(Point begin, Point end, vec3 lineColor)
             y = (int)y2;
             xe = (int)x1;
         }
-        // wnd.setPixel(x, y, lineColor);
         drawPixel();
         for (i = 0; x < xe; i++)
         {
@@ -331,4 +324,9 @@ void rasterizer::drawLine(Point begin, Point end, vec3 lineColor)
             drawPixel();
         }
     }
+}
+
+void rasterizer::setBkColor(int r, int g, int b)
+{
+    bkColor = (r << 16) | (g << 8) | b;
 }
