@@ -4,11 +4,17 @@
 #include <mutex>
 #include <atomic>
 #include "vec.h"
-#include <opencv2/opencv.hpp>
+#include <SDL.h>
+#include <vector>
+
 class simpleWindow
 {
 private:
-    cv::Mat wndMat;
+    SDL_Window* window = nullptr;
+    SDL_Renderer* renderer = nullptr;
+    SDL_Texture* texture = nullptr;
+    std::vector<uint32_t> pixels;
+    bool shouldCloseFlag = false;
     int nWidth, nHeight;
     int lstWidth, lstHeight;
     bool bPress[128];
@@ -18,6 +24,7 @@ private:
     vec3 bkColor;
 
 public:
+    ~simpleWindow();
     void create(const char *name, int width, int height);
     void show();
     bool shouldClose();

@@ -11,6 +11,7 @@
 #include <time.h>
 #include <cmath>
 #include <any>
+// #undef main
 using namespace std;
 
 const int width = 700, height = 700;
@@ -29,7 +30,7 @@ float getfps()
         return 0;
     return q.size() / (float(nt - q.front()) / CLOCKS_PER_SEC);
 }
-int main()
+int main(int argc,char* argv[])
 {
     cout << std::thread::hardware_concurrency() << endl;
     wnd.create("hello world", width, height);

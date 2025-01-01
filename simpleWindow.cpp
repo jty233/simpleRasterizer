@@ -1,48 +1,99 @@
 #include "simpleWindow.h"
+#include <SDL.h>
 #include <string>
 #include <iostream>
 #include <thread>
 #include <future>
 
 using namespace std;
-using namespace cv;
+
+simpleWindow::~simpleWindow()
+{
+    if (texture) SDL_DestroyTexture(texture);
+    if (renderer) SDL_DestroyRenderer(renderer);
+    if (window) SDL_DestroyWindow(window);
+    SDL_Quit();
+}
 
 void simpleWindow::create(const char *name, int width, int height)
 {
-    wndMat.create(height, width, CV_8UC3);
+    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
+        cerr << "SDL could not initialize! Error: " << SDL_GetError() << endl;
+        return;
+    }
+
+    window = SDL_CreateWindow(name,
+                             SDL_WINDOWPOS_CENTERED,
+                             SDL_WINDOWPOS_CENTERED,
+                             width, height,
+                             SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
+    if (!window) {
+        cerr << "Window could not be created! Error: " << SDL_GetError() << endl;
+        return;
+    }
+
+    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
+    if (!renderer) {
+        cerr << "Renderer could not be created! Error: " << SDL_GetError() << endl;
+        return;
+    }
+
+    texture = SDL_CreateTexture(renderer,
+                               SDL_PIXELFORMAT_ARGB8888,
+                               SDL_TEXTUREACCESS_STREAMING,
+                               width, height);
+    if (!texture) {
+        cerr << "Texture could not be created! Error: " << SDL_GetError() << endl;
+        return;
+    }
+
+    pixels.resize(width * height);
     lstWidth = nWidth = width;
     lstHeight = nHeight = height;
 
-    windowName = name;
-    namedWindow(windowName, cv::WINDOW_NORMAL);
-    resizeWindow(windowName, width, height);
-
+    clear();
     show();
 }
 
 void simpleWindow::show()
 {
-    imshow(windowName, wndMat);
-    resize(wndMat, wndMat, {lstWidth, lstHeight});
-    auto res = getWindowImageRect(windowName);
-    if (resizeCallback)
-        resizeCallback(res.width, res.height);
-    lstWidth = res.width;
-    lstHeight = res.height;
-    lastPress = waitKey(1);
+    SDL_UpdateTexture(texture, nullptr, pixels.data(), nWidth * sizeof(uint32_t));
+    SDL_RenderClear(renderer);
+    SDL_RenderCopy(renderer, texture, nullptr, nullptr);
+    SDL_RenderPresent(renderer);
+
+    SDL_Event event;
+    while (SDL_PollEvent(&event)) {
+        switch (event.type) {
+            case SDL_QUIT:
+                shouldCloseFlag = true;
+                break;
+            case SDL_WINDOWEVENT:
+                if (event.window.event == SDL_WINDOWEVENT_RESIZED) {
+                    lstWidth = event.window.data1;
+                    lstHeight = event.window.data2;
+                    if (resizeCallback) {
+                        resizeCallback(lstWidth, lstHeight);
+                    }
+                }
+                break;
+            case SDL_KEYDOWN:
+                lastPress = event.key.keysym.sym;
+                break;
+        }
+    }
 }
 
 bool simpleWindow::shouldClose()
 {
-    return getWindowProperty(windowName, WND_PROP_VISIBLE) < 1;
+    return shouldCloseFlag;
 }
 
 void simpleWindow::setPixel(int x, int y, int r, int g, int b)
 {
-    y = wndMat.rows - y;
-    wndMat.at<Vec3b>(y, x)[0] = b;
-    wndMat.at<Vec3b>(y, x)[1] = g;
-    wndMat.at<Vec3b>(y, x)[2] = r;
+    if (x < 0 || x >= nWidth || y < 0 || y >= nHeight) return;
+    y = nHeight - y - 1;
+    pixels[y * nWidth + x] = (0xFF << 24) | (r << 16) | (g << 8) | b;
 }
 
 void simpleWindow::setPixel(int x, int y, vec3 color)
@@ -52,9 +103,11 @@ void simpleWindow::setPixel(int x, int y, vec3 color)
 
 void simpleWindow::clear()
 {
-    for (int i = 0; i < wndMat.rows; i++)
-        for (int j = 0; j < wndMat.cols; j++)
-            wndMat.at<Vec3b>(i, j) = Vec3b{(uchar)bkColor[0], (uchar)bkColor[1], (uchar)bkColor[2]};
+    uint32_t color = (0xFF << 24) | 
+                    ((uint8_t)bkColor[0] << 16) | 
+                    ((uint8_t)bkColor[1] << 8) | 
+                    (uint8_t)bkColor[2];
+    fill(pixels.begin(), pixels.end(), color);
 }
 
 void simpleWindow::setBkColor(int r, int g, int b)
@@ -72,7 +125,5 @@ char simpleWindow::getKey()
 {
     char key = lastPress;
     lastPress = 0;
-    if (key & 32)
-        key ^= 32;
     return key;
 }
