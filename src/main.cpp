@@ -19,20 +19,20 @@ camera cam;
 simpleWindow wnd;
 rasterizer ras(width, height);
 float getfps()
-{
-    static queue<int> q;
+{  
+    using fsec = chrono::time_point<std::chrono::_V2::system_clock, chrono::duration<double>>;
+    static queue<fsec> q;
     int dur = 1;
-    clock_t nt = clock();
-    while (q.size() && (nt - q.front()) > dur * CLOCKS_PER_SEC)
+    fsec curt = chrono::system_clock::now();
+    while (q.size() && (curt - q.front()).count() > dur)
         q.pop();
-    q.push(nt);
+    q.push(curt);
     if (q.size() == 1)
         return 0;
-    return q.size() / (float(nt - q.front()) / CLOCKS_PER_SEC);
+    return q.size() / (curt - q.front()).count();
 }
 int main(int argc,char* argv[])
 {
-    cout << std::thread::hardware_concurrency() << endl;
     wnd.create("hello world", width, height);
     ras.setBkColor(220, 230, 210);
 
@@ -92,12 +92,14 @@ int main(int argc,char* argv[])
         if (key == 'a')
         {
             // cam.transform(vec3(-1, 0, 0));
-            mod = mod.rotate(-5, vec3(0, 1, 0));
+            // mod = mod.rotate(-5, vec3(0, 1, 0));
+            mod = mod.translate({1, 0, 0});
         }
         else if (key == 'd')
         {
+            mod = mod.translate({-1, 0, 0});
             // cam.transform(vec3(1, 0, 0));
-            mod = mod.rotate(5, vec3(0, 1, 0));
+            // mod = mod.rotate(5, vec3(0, 1, 0));
         }
         else if (key == 'w')
         {

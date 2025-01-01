@@ -1,5 +1,6 @@
 #include "rasterizer.h"
 #include <cmath>
+#include <algorithm>
 using namespace std;
 
 void rasterizer::clearBuffer()
@@ -19,63 +20,38 @@ static void computeBarycentric2D(double x, double y, const Triangle &t, double *
     param[2] = (x * (ya - yb) + (xb - xa) * y + xa * yb - xb * ya) / (xc * (ya - yb) + (xb - xa) * yc + xa * yb - xb * ya);
 }
 
-void rasterizer::drawTriangle(Triangle tri, Triangle ctri, const model &mod)
+void rasterizer::drawTriangle(Triangle tri, Triangle ctri, const model &mod,
+                            int startX, int startY, int endX, int endY)
 {
-    int ax = (int)tri.getVertex(0)[0], ay = (int)ceil(tri.getVertex(0)[1]);
-    int bx = (int)tri.getVertex(1)[0], by = (int)ceil(tri.getVertex(1)[1]);
-    int cx = (int)tri.getVertex(2)[0], cy = (int)ceil(tri.getVertex(2)[1]);
-
-    int minx = min(min(ax, bx), cx);
-    int maxx = max(max(ax, bx), cx);
-    int miny = min(min(ay, by), cy);
-    int maxy = max(max(ay, by), cy);
-
-    int l = max(minx, 0), r = min(maxx, width - 1);
-    int lidx = 0, ridx = 0;
-    for (int i = l; i <= r; i++)
+    
+    // 遍历指定区域内的像素
+    for (int i = startX; i <= endX; i++) 
     {
-        if (lidx == 0 && ridx == 0)
-        {
-            for (int j = max(miny, 0); j <= min(maxy, height - 1); j++)
-                if (tri.inside(i, j))
-                {
-                    lidx = j;
-                    break;
-                }
-            for (int j = min(maxy, height - 1); j >= max(miny, 0); j--)
-                if (tri.inside(i, j))
-                {
-                    ridx = j;
-                    break;
-                }
-            if (lidx == 0 || ridx == 0)
-                continue;
-        }
-        else
-        {
-            while (tri.inside(i, lidx) && lidx > max(miny, 0))
-                lidx--;
-            while (!tri.inside(i, lidx) && lidx < min(maxy, height - 1))
-                lidx++;
-            if (lidx == min(maxy, height - 1))
-            {
-                while (!tri.inside(i, lidx) && lidx > max(miny, 0))
-                    lidx--;
-                while (tri.inside(i, lidx) && lidx > max(miny, 0))
-                    lidx--;
-                lidx++;
+        // 找到当前列的有效扫描线范围
+        int top = startY, bottom = endY;
+        bool found = false;
+        
+        // 从上到下查找三角形边界
+        for (int j = top; j <= bottom; j++) {
+            if (tri.inside(i, j)) {
+                top = j;
+                found = true;
+                break;
             }
-            ridx = max(ridx, lidx);
-            while (tri.inside(i, ridx) && ridx < min(maxy, height - 1))
-                ridx++;
-            while (!tri.inside(i, ridx) && ridx > max(miny, 0))
-                ridx--;
         }
-        ridx = min(ridx, height - 1);
-        for (int j = lidx; j <= ridx; j++)
+        
+        if (!found) continue;
+        // 从下到上查找三角形边界
+        for (int j = bottom; j >= top; j--) {
+            if (tri.inside(i, j)) {
+                bottom = j;
+                break;
+            }
+        }
+        
+        // 处理当前列的像素
+        for (int j = top; j <= bottom; j++)
         {
-            if (!tri.inside(i, j))
-                continue;
             double param[3];
             computeBarycentric2D(i, j, tri, param);
             vec3 p, p2;
@@ -198,10 +174,31 @@ std::span<uint32_t> rasterizer::draw()
                 else
                     tri.normal[i] = nor;
             }
+            int ax = (int)tri.getVertex(0)[0], ay = (int)ceil(tri.getVertex(0)[1]);
+            int bx = (int)tri.getVertex(1)[0], by = (int)ceil(tri.getVertex(1)[1]);
+            int cx = (int)tri.getVertex(2)[0], cy = (int)ceil(tri.getVertex(2)[1]);
+
+            int minx = min({ax, bx, cx});
+            int maxx = max({ax, bx, cx});
+            int miny = min({ay, by, cy});
+            int maxy = max({ay, by, cy});
+
+            int endx = min(width - 1, maxx);
+            int endy = min(height - 1, maxy);
 #ifndef __DEBUG__
-            v.push_back(poolIns.assign(bind(&rasterizer::drawTriangle, this, tri, ctri, ref(m))));
+            const int blockSize = 16;
+
+            for (int x = max(0, minx); x <= endx; x += blockSize) {
+                for (int y = max(0, miny); y <= endy; y += blockSize) {
+                    int endX = min(x + blockSize, endx);
+                    int endY = min(y + blockSize, endy);
+                    v.push_back(poolIns.assign(
+                        bind(&rasterizer::drawTriangle, this, tri, ctri, ref(m),
+                             x, y, endX, endY)));
+                }
+            }
 #else
-            drawTriangle(tri, ctri, m);
+            drawTriangle(tri, ctri, m, minx, miny, maxx, maxy);
 #endif
         }
     }

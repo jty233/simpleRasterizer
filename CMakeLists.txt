@@ -10,7 +10,7 @@ endif()
 
 find_package(SDL2 CONFIG REQUIRED)
 
-include_directories(include)
+include_directories(include ${CMAKE_SOURCE_DIR})
 file(GLOB SOURCE src/*.cpp)
 add_executable(games ${SOURCE})
 target_link_libraries(

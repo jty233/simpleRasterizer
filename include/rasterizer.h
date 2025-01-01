@@ -23,7 +23,8 @@ private:
     std::vector<std::reference_wrapper<model>> models;
 
     void clearBuffer();
-    void drawTriangle(Triangle tri, Triangle ctri, const model &mod);
+    void drawTriangle(Triangle tri, Triangle ctri, const model &mod,
+                     int startX, int startY, int endX, int endY);
     void setPixel(int x, int y, int r, int g, int b);
 
 public:
