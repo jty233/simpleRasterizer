@@ -172,19 +172,28 @@ void rasterizer::setRasterizeSize(int _width, int _height)
 
 std::span<uint32_t> rasterizer::draw()
 {
+    static future<void> cls;
+    static Matrix viewpointMatrix;
+    static Matrix vpv;
     if (pCam && resize)
     {
         pCam->resize(width, height);
         resize = false;
-    }
+        cls = async(&rasterizer::clearBuffer, this);
 
-    clearBuffer();
+        viewpointMatrix = {
+            {width / 2., 0, 0, width / 2.},
+            {0, height / 2., 0, height / 2.},
+            {0, 0, 1, 0},
+            {0, 0, 0, 1}};
+        
+    }
+    if (pCam)
+        vpv = viewpointMatrix * pCam->projectionMatrix * pCam->viewMatrix;
+
+    if (cls.valid())
+        cls.get();
     // const vec3 &view_pos = pCam->pos;
-    Matrix viewpointMatrix = {
-        {width / 2., 0, 0, width / 2.},
-        {0, height / 2., 0, height / 2.},
-        {0, 0, 1, 0},
-        {0, 0, 0, 1}};
 
     for (auto mref : models)
     {
@@ -192,7 +201,7 @@ std::span<uint32_t> rasterizer::draw()
         Matrix mvpv, mv;
         if (pCam)
         {
-            mvpv = viewpointMatrix * pCam->projectionMatrix * pCam->viewMatrix * m.modelMatrix;
+            mvpv = vpv * m.modelMatrix;
             mv = pCam->viewMatrix * m.modelMatrix;
         }
         else
@@ -224,13 +233,13 @@ std::span<uint32_t> rasterizer::draw()
                 else
                     tri.normal[i] = nor;
             }
-            double ax = tri.getVertex(0)[0], ay = ceil(tri.getVertex(0)[1]);
-            double bx = tri.getVertex(1)[0], by = ceil(tri.getVertex(1)[1]);
-            double cx = tri.getVertex(2)[0], cy = ceil(tri.getVertex(2)[1]);
+            double ax = tri.getVertex(0)[0], ay = tri.getVertex(0)[1];
+            double bx = tri.getVertex(1)[0], by = tri.getVertex(1)[1];
+            double cx = tri.getVertex(2)[0], cy = tri.getVertex(2)[1];
 
-            int minx = ceil(min({ax, bx, cx}));
+            int minx = min({ax, bx, cx});
             int maxx = max({ax, bx, cx});
-            int miny = ceil(min({ay, by, cy}));
+            int miny = min({ay, by, cy});
             int maxy = max({ay, by, cy});
 
             int endx = min(width, maxx + 1);
@@ -247,6 +256,7 @@ std::span<uint32_t> rasterizer::draw()
     for (auto &f : threads)
         f.get();
     threads.clear();
+    cls = async(&rasterizer::clearBuffer, this);
     return span<uint32_t>(frameBuffer);
 }
 
