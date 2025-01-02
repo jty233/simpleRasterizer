@@ -21,10 +21,11 @@ private:
     lightShader lig;
     ThreadPool &poolIns;
     std::vector<std::reference_wrapper<model>> models;
+    std::vector<std::future<void>> threads;
 
     void clearBuffer();
-    void drawTriangle(Triangle tri, Triangle ctri, const model &mod,
-                     int startX, int startY, int endX, int endY);
+    void drawTriangle(Triangle tri, Triangle ctri, const model &mod, int startX, int endX, bool mutiThread = false);
+    void rasterizeLine(Triangle tri, Triangle ctri, const model &mod, int x, int startY, int endY);
     void setPixel(int x, int y, int r, int g, int b);
 
 public:

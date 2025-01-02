@@ -19,87 +19,136 @@ static void computeBarycentric2D(double x, double y, const Triangle &t, double *
     param[1] = (x * (yc - ya) + (xa - xc) * y + xc * ya - xa * yc) / (xb * (yc - ya) + (xa - xc) * yb + xc * ya - xa * yc);
     param[2] = (x * (ya - yb) + (xb - xa) * y + xa * yb - xb * ya) / (xc * (ya - yb) + (xb - xa) * yc + xa * yb - xb * ya);
 }
-
-void rasterizer::drawTriangle(Triangle tri, Triangle ctri, const model &mod,
-                            int startX, int startY, int endX, int endY)
+double calculateIntersection(double c, const Point &p1, const Point &p2)
 {
-    
-    // 遍历指定区域内的像素
-    for (int i = startX; i <= endX; i++) 
+    // 计算斜率
+    double dx = p2.data[0] - p1.data[0];
+    double dy = p2.data[1] - p1.data[1];
+    double m = dy / dx; // 斜率
+
+    // 计算交点的 y 坐标
+    double y = p1.data[1] + m * (c - p1.data[0]);
+    return y;
+}
+
+// 检查边是否与直线 x = c 相交
+void checkEdgeForIntersections(double c, const Point &p1, const Point &p2, vector<double> &intersections)
+{
+    if (p1.data[0] == p2.data[0])
     {
-        // 找到当前列的有效扫描线范围
-        int top = startY, bottom = endY;
-        bool found = false;
-        
-        // 从上到下查找三角形边界
-        for (int j = top; j <= bottom; j++) {
-            if (tri.inside(i, j)) {
-                top = j;
-                found = true;
-                break;
-            }
-        }
-        
-        if (!found) continue;
-        // 从下到上查找三角形边界
-        for (int j = bottom; j >= top; j--) {
-            if (tri.inside(i, j)) {
-                bottom = j;
-                break;
-            }
-        }
-        
-        // 处理当前列的像素
-        for (int j = top; j <= bottom; j++)
+        // 垂直边
+        if (p1.data[0] == c)
         {
-            double param[3];
-            computeBarycentric2D(i, j, tri, param);
-            vec3 p, p2;
-            for (int i = 0; i < 3; i++)
-                for (int j = 0; j < 3; j++)
-                {
-                    p[i] += param[j] * tri.getVertex(j)[i];
-                    p2[i] += param[j] * ctri.getVertex(j)[i];
-                }
-            float z = float(-p[2]);
-            if (z >= zBuffer[j * width + i])
-                continue;
+            // 整条边都在 x = c 上，添加两个端点
+            intersections.push_back(p1.data[1]);
+            intersections.push_back(p2.data[1]);
+        }
+        // 否则不相交
+    }
+    else
+    {
+        // 非垂直边，检查是否与 x = c 相交
+        if ((p1.data[0] - c) * (p2.data[0] - c) <= 0)
+        {
+            // 计算交点并添加
+            double intersection = calculateIntersection(c, p1, p2);
+            intersections.push_back(intersection);
+        }
+    }
+}
 
-            double r = 0, g = 0, b = 0;
-            for (int i = 0; i < 3; i++)
-            {
-                r += param[i] * tri.colorR[i];
-                g += param[i] * tri.colorG[i];
-                b += param[i] * tri.colorB[i];
-            }
+// 找到直线 x = c 与三角形边界的所有交点
+optional<pair<int, int>> findIntersections(double c, const Point &A, const Point &B, const Point &C)
+{
+    vector<double> intersections;
 
-            vec3 nor;
-            double uTex = 0, vTex = 0;
-            for (int i = 0; i < 3; i++)
-            {
-                nor += tri.normal[i].value() * param[i];
-                uTex += tri.uTex[i] * param[i];
-                vTex += tri.vTex[i] * param[i];
-            }
-            // nor.abs();
+    // 检查边 AB
+    checkEdgeForIntersections(c, A, B, intersections);
 
-            // vec3 color = texColor;
-            vec3 color;
-            vec3 baseColor = mod.pTextureData ? mod.getTexColor(uTex, vTex) : vec3(r, g, b);
-            if (lig.lightPos.empty())
-                color = baseColor;
+    // 检查边 BC
+    checkEdgeForIntersections(c, B, C, intersections);
+
+    // 检查边 CA
+    checkEdgeForIntersections(c, C, A, intersections);
+
+    if (intersections.empty())
+        return nullopt;
+
+    sort(intersections.begin(), intersections.end());
+
+    return make_optional<pair<int, int>>(ceil(intersections.front()), intersections.back());
+}
+
+void rasterizer::drawTriangle(Triangle tri, Triangle ctri, const model &mod, int startX, int endX, bool mutiThread)
+{
+
+    for (int i = startX; i < endX; i++)
+    {
+        auto opt = findIntersections(i, tri.getVertex(0), tri.getVertex(1), tri.getVertex(2));
+        if (opt)
+        {
+            auto [p1, p2] = *opt;
+            p1 = max(0, p1);
+            p2 = min(height - 1, p2);
+            if (mutiThread)
+                threads.push_back(poolIns.assign(bind(&rasterizer::rasterizeLine, this, tri, ctri, ref(mod), i, p1, p2)));
             else
-                color = lig(p2, nor, baseColor, pCam ? pCam->pos : vec3(0, 0, 1));
-            // vec3 color = lig(p2, nor, vec3(r, g, b), pCam->pos);
-            // vec3 color = (nor + vec3(1, 1, 1)) * 255 / 2.0;
-            float oldValue = zBuffer[j * width + i].load();
-            while (z < oldValue)
+                rasterizeLine(tri, ctri, mod, i, p1, p2);
+        }
+    }
+}
+
+void rasterizer::rasterizeLine(Triangle tri, Triangle ctri, const model &mod, int x, int startY, int endY)
+{
+    for (int j = startY; j <= endY; j++)
+    {
+        double param[3];
+        computeBarycentric2D(x, j, tri, param);
+        vec3 p, p2;
+        for (int i = 0; i < 3; i++)
+            for (int j = 0; j < 3; j++)
             {
-                if (zBuffer[j * width + i].compare_exchange_weak(oldValue, z))
-                {
-                    setPixel(j, i, color[0], color[1], color[2]);
-                    break;
-                }
+                p[i] += param[j] * tri.getVertex(j)[i];
+                p2[i] += param[j] * ctri.getVertex(j)[i];
+            }
+        float z = float(-p[2]);
+        if (z >= zBuffer[j * width + x])
+            continue;
+
+        double r = 0, g = 0, b = 0;
+        for (int i = 0; i < 3; i++)
+        {
+            r += param[i] * tri.colorR[i];
+            g += param[i] * tri.colorG[i];
+            b += param[i] * tri.colorB[i];
+        }
+
+        vec3 nor;
+        double uTex = 0, vTex = 0;
+        for (int i = 0; i < 3; i++)
+        {
+            nor += tri.normal[i].value() * param[i];
+            uTex += tri.uTex[i] * param[i];
+            vTex += tri.vTex[i] * param[i];
+        }
+        // nor.abs();
+
+        // vec3 color = texColor;
+        vec3 color;
+        vec3 baseColor = mod.pTextureData ? mod.getTexColor(uTex, vTex) : vec3(r, g, b);
+        if (lig.lightPos.empty())
+            color = baseColor;
+        else
+            color = lig(p2, nor, baseColor, pCam ? pCam->pos : vec3(0, 0, 1));
+        // vec3 color = lig(p2, nor, vec3(r, g, b), pCam->pos);
+        // vec3 color = (nor + vec3(1, 1, 1)) * 255 / 2.0;
+        float oldValue = zBuffer[j * width + x].load();
+        while (z < oldValue)
+        {
+            if (zBuffer[j * width + x].compare_exchange_weak(oldValue, z))
+            {
+                setPixel(j, x, color[0], color[1], color[2]);
+                break;
             }
         }
     }
@@ -120,6 +169,7 @@ void rasterizer::setRasterizeSize(int _width, int _height)
     height = _height;
     resize = true;
 }
+
 std::span<uint32_t> rasterizer::draw()
 {
     if (pCam && resize)
@@ -136,7 +186,6 @@ std::span<uint32_t> rasterizer::draw()
         {0, 0, 1, 0},
         {0, 0, 0, 1}};
 
-    vector<future<void>> v;
     for (auto mref : models)
     {
         model &m = mref.get();
@@ -162,6 +211,7 @@ std::span<uint32_t> rasterizer::draw()
         for (Triangle ctri : m.tris)
         {
             Triangle tri = (mvpv * ctri).normalize();
+            Triangle test = mvpv * ctri;
             ctri = (mv * ctri).normalize();
 
             vec3 ab(ctri.getVertex(1)[0] - ctri.getVertex(0)[0], ctri.getVertex(1)[1] - ctri.getVertex(0)[1], ctri.getVertex(1)[2] - ctri.getVertex(0)[2]);
@@ -174,36 +224,29 @@ std::span<uint32_t> rasterizer::draw()
                 else
                     tri.normal[i] = nor;
             }
-            int ax = (int)tri.getVertex(0)[0], ay = (int)ceil(tri.getVertex(0)[1]);
-            int bx = (int)tri.getVertex(1)[0], by = (int)ceil(tri.getVertex(1)[1]);
-            int cx = (int)tri.getVertex(2)[0], cy = (int)ceil(tri.getVertex(2)[1]);
+            double ax = tri.getVertex(0)[0], ay = ceil(tri.getVertex(0)[1]);
+            double bx = tri.getVertex(1)[0], by = ceil(tri.getVertex(1)[1]);
+            double cx = tri.getVertex(2)[0], cy = ceil(tri.getVertex(2)[1]);
 
-            int minx = min({ax, bx, cx});
+            int minx = ceil(min({ax, bx, cx}));
             int maxx = max({ax, bx, cx});
-            int miny = min({ay, by, cy});
+            int miny = ceil(min({ay, by, cy}));
             int maxy = max({ay, by, cy});
 
-            int endx = min(width - 1, maxx);
-            int endy = min(height - 1, maxy);
-#ifndef __DEBUG__
-            const int blockSize = 16;
-
-            for (int x = max(0, minx); x <= endx; x += blockSize) {
-                for (int y = max(0, miny); y <= endy; y += blockSize) {
-                    int endX = min(x + blockSize, endx);
-                    int endY = min(y + blockSize, endy);
-                    v.push_back(poolIns.assign(
-                        bind(&rasterizer::drawTriangle, this, tri, ctri, ref(m),
-                             x, y, endX, endY)));
-                }
-            }
-#else
-            drawTriangle(tri, ctri, m, minx, miny, maxx, maxy);
-#endif
+            int endx = min(width, maxx + 1);
+            int startx = max(0, minx);
+            int endy = min(height, maxy + 1);
+            int starty = max(0, miny);
+            bool interThread = (endy - starty > 100);
+            if (interThread)
+                drawTriangle(tri, ctri, m, startx, endx, true);
+            else
+                threads.push_back(poolIns.assign(bind(&rasterizer::drawTriangle, this, tri, ctri, ref(m), startx, endx, false)));
         }
     }
-    for (auto &f : v)
+    for (auto &f : threads)
         f.get();
+    threads.clear();
     return span<uint32_t>(frameBuffer);
 }
 

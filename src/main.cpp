@@ -55,7 +55,7 @@ int main(int argc,char* argv[])
     // mod.translate(vec3(-1, -1, 0));
     // mod.scale(vec3(2, 2, 2));
     // for (int i = 0; i < 12; i++)
-    //     mod.getTriangle(i).setColor(0, 0, 100);
+    //     mod.getTriangle(i).setColor(155, 0, 100);
 
     objl::Loader Loader;
     Loader.LoadFile("../models/spot/spot_triangulated_good.obj");
