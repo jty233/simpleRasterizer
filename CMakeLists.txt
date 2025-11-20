@@ -6,8 +6,6 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     add_definitions(-D__DEBUG__)
 endif()
 
-
-
 find_package(SDL2 CONFIG REQUIRED)
 
 include_directories(include ${CMAKE_SOURCE_DIR})
