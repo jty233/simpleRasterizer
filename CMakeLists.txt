@@ -7,6 +7,7 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
 endif()
 
 find_package(SDL2 CONFIG REQUIRED)
+find_package(OpenGL REQUIRED)
 
 include_directories(include ${CMAKE_SOURCE_DIR})
 file(GLOB SOURCE src/*.cpp)
@@ -17,4 +18,6 @@ target_link_libraries(
     ${SDL2_LIBRARIES}
     SDL2::SDL2main
     SDL2::SDL2
+    OpenGL::GL
+    ${CMAKE_DL_LIBS}
 )

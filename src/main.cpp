@@ -147,11 +147,11 @@ int main(int argc,char* argv[])
         std::span<uint32_t> data;
         if (useGPU) {
             data = gpu_ras.draw(); // GPU渲染任务
+            wnd.showWithOpenGL(data); // 使用OpenGL显示
         } else {
             data = cpu_ras.draw(); // CPU渲染任务
+            wnd.show(data);    // 使用传统方法显示
         }
-        
-        wnd.show(data);    // 消息处理循环
 
         // this_thread::sleep_for(100ms);
         cout << '\r' << getfps() << "      ";
